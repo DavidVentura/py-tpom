@@ -1,4 +1,4 @@
-use chrono::{offset::Utc, DateTime, Local, NaiveDate};
+use chrono::{DateTime, Local, NaiveDate};
 use lazy_static::lazy_static;
 use pyo3::prelude::*;
 use pyo3::types::{PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyTimeAccess};
