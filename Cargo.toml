@@ -9,8 +9,8 @@ name = "py_timekeeper"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.17.3", features = ["extension-module"] }
-tpom = { path = "../timekeeper" }
+pyo3 = { version = "0.19.2", features = ["extension-module"] }
+tpom = { path = "../tpom" }
 lazy_static = "1.4.0"
 chrono = "0.4.23"
 
