@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyTimeAccess};
 use pyo3::Python;
 use std::sync::RwLock;
-use tpom::{vdso, BackupEntry, TVDSOFun, TimeSpec, TimeVal};
+use tpom::{vdso, TVDSOFun, TimeSpec};
 
 lazy_static! {
     static ref NOW: RwLock<f64> = RwLock::new(0.0);
@@ -26,7 +26,7 @@ fn py_datetime_to_naive_datetime(dt: &PyDateTime) -> DateTime<Local> {
             dt.get_microsecond(),
         )
         .unwrap();
-    DateTime::from_local(nd, Local::now().offset().clone())
+    DateTime::from_local(nd, *Local::now().offset())
 }
 
 #[pymethods]
@@ -67,7 +67,7 @@ impl Freezer {
     pub fn __enter__<'p>(slf: PyRef<'p, Self>, _py: Python<'p>) -> PyResult<PyRef<'p, Self>> {
         let og = slf.v.entry(tpom::Kind::GetTime).unwrap();
         og.overwrite(|_| {
-            let now = NOW.read().expect("clock_gettime").clone();
+            let now = *NOW.read().expect("clock_gettime");
             let now_sec = now.trunc() as i64;
             let delta = now - now.trunc();
             let nanos = (delta * 1_000_000_000.0) as i64;
