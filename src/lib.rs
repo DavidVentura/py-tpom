@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyTimeAccess};
 use pyo3::Python;
 use std::sync::RwLock;
-use tpom::{ClockController, Time, TimeSpec, TimeVal};
+use tpom::{vdso, BackupEntry, TVDSOFun, TimeSpec, TimeVal};
 
 lazy_static! {
     static ref NOW: RwLock<f64> = RwLock::new(0.0);
@@ -13,6 +13,7 @@ lazy_static! {
 #[pyclass]
 pub struct Freezer {
     now: f64,
+    v: vdso::vDSO,
 }
 
 fn py_datetime_to_naive_datetime(dt: &PyDateTime) -> DateTime<Local> {
@@ -27,6 +28,7 @@ fn py_datetime_to_naive_datetime(dt: &PyDateTime) -> DateTime<Local> {
         .unwrap();
     DateTime::from_local(nd, Local::now().offset().clone())
 }
+
 #[pymethods]
 impl Freezer {
     #[new]
@@ -36,6 +38,7 @@ impl Freezer {
         *w = d.timestamp_millis() as f64 / 1000.0;
         Ok(Freezer {
             now: d.timestamp_millis() as f64 / 1000.0,
+            v: vdso::vDSO::open().unwrap(),
         })
     }
 
@@ -60,50 +63,30 @@ impl Freezer {
 
         PyDateTime::from_timestamp(py, self.now, None)
     }
-    pub fn __enter__(slf: Py<Self>) -> Py<Self> {
-        ClockController::overwrite(
-            Some(|_| {
-                let now = NOW.read().expect("clock_gettime").clone();
-                let now_sec = now.trunc() as i64;
-                let delta = now - now.trunc();
-                let nanos = (delta * 1_000_000_000.0) as i64;
-                TimeSpec {
-                    seconds: now_sec,
-                    nanos,
-                }
-            }),
-            Some(|| {
-                let now = NOW.read().expect("time").clone();
-                let now_sec = now.trunc() as Time;
-                now_sec
-            }),
-            None,
-            Some(|| {
-                let now = NOW.read().expect("gettimeofday").clone();
-                let now_sec = now.trunc() as i64;
-                let delta = now - now.trunc();
-                let micros = (delta * 1_000_000.0) as i64;
-                TimeVal {
-                    seconds: now_sec,
-                    micros,
-                }
-            }),
-        );
-        slf
+
+    pub fn __enter__<'p>(slf: PyRef<'p, Self>, _py: Python<'p>) -> PyResult<PyRef<'p, Self>> {
+        let og = slf.v.entry(tpom::Kind::GetTime).unwrap();
+        og.overwrite(|_| {
+            let now = NOW.read().expect("clock_gettime").clone();
+            let now_sec = now.trunc() as i64;
+            let delta = now - now.trunc();
+            let nanos = (delta * 1_000_000_000.0) as i64;
+            TimeSpec {
+                seconds: now_sec,
+                nanos,
+            }
+        });
+        drop(og);
+        Ok(slf)
     }
     pub fn __exit__(&mut self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
-        ClockController::restore()
+        self.v.restore();
     }
 }
 
-#[pyfunction]
-fn is_overwritten() -> bool {
-    ClockController::is_overwritten()
-}
 /// A Python module implemented in Rust.
 #[pymodule]
 fn py_timekeeper(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Freezer>()?;
-    m.add_wrapped(wrap_pyfunction!(is_overwritten))?;
     Ok(())
 }

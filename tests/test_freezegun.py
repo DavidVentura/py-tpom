@@ -1,11 +1,5 @@
-from py_timekeeper import Freezer, is_overwritten
+from py_timekeeper import Freezer
 from datetime import datetime, timedelta
-
-def test_overwritten():
-    assert not is_overwritten()
-    with Freezer(datetime.now()):
-        assert is_overwritten()
-    assert not is_overwritten()
 
 def test_time_changes():
     target = datetime(2012, 1, 14, 1, 2, 3)
