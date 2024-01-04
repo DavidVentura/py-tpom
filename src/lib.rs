@@ -38,7 +38,7 @@ impl Freezer {
         *w = d.timestamp_millis() as f64 / 1000.0;
         Ok(Freezer {
             now: d.timestamp_millis() as f64 / 1000.0,
-            v: vdso::vDSO::open().unwrap(),
+            v: vdso::vDSO::read().unwrap(),
         })
     }
 
